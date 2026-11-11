@@ -18,7 +18,7 @@ jobs:
 
       - name: Build Archive
         run: |
-          xcodebuild -scheme "RetroPod" \
+          xcodebuild -scheme "ios_make" \
                      -sdk iphoneos \
                      -configuration Release \
                      -archivePath "$PWD/build/RetroPod.xcarchive" \

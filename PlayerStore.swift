@@ -20,6 +20,15 @@ final class PlayerStore: ObservableObject {
     @Published var sound = true
     @Published var playlists: [Playlist] = PlayerStore.loadPlaylists() { didSet { savePlaylists() } }
     @Published var queue: [Track] = []   // 비어 있으면 전체 라이브러리 순서로 재생
+    @Published var lang: Lang = PlayerStore.loadLang() { didSet { UserDefaults.standard.set(lang.rawValue, forKey: "lang") } }
+
+    static func loadLang() -> Lang {
+        if let r = UserDefaults.standard.string(forKey: "lang"), let l = Lang(rawValue: r) { return l }
+        return Locale.current.language.languageCode?.identifier == "ko" ? .ko : .en
+    }
+
+    /// UI 문자열 번역 (사전에 없으면 원문 그대로)
+    func t(_ key: String) -> String { lang == .ko ? (L10n.ko[key] ?? key) : key }
 
     let player = AVPlayer()
     let mvPlayer = AVPlayer()
@@ -88,9 +97,9 @@ final class PlayerStore: ObservableObject {
         if let it = AVMetadataItem.metadataItems(from: items, filteredByIdentifier: .commonIdentifierArtwork).first {
             art = try? await it.load(.dataValue)
         }
-        let title = await text(.commonIdentifierTitle)
-        let artist = await text(.commonIdentifierArtist)
-        let album = await text(.commonIdentifierAlbumName)
+        let title = await text(.commonIdentifierTitle).map(KoreanFix.fix)
+        let artist = await text(.commonIdentifierArtist).map(KoreanFix.fix)
+        let album = await text(.commonIdentifierAlbumName).map(KoreanFix.fix)
         return Track(url: url,
                      title: title ?? url.deletingPathExtension().lastPathComponent,
                      artist: artist ?? "Unknown Artist",
@@ -154,8 +163,9 @@ final class PlayerStore: ObservableObject {
     private func loadLyrics(for t: Track, index i: Int, duration: Double) async {
         var result: [LyricLine] = []
         let side = t.url.deletingPathExtension().appendingPathExtension("lrc")
-        if let s = try? String(contentsOf: side, encoding: .utf8) { result = LRC.parse(s) }
-        if result.isEmpty, let s = try? await AVURLAsset(url: t.url).load(.lyrics), !s.isEmpty {
+        if let d = try? Data(contentsOf: side), let s = KoreanFix.decode(d) { result = LRC.parse(s) }
+        if result.isEmpty, let raw = try? await AVURLAsset(url: t.url).load(.lyrics), !raw.isEmpty {
+            let s = KoreanFix.fix(raw)
             let p = LRC.parse(s)
             result = p.isEmpty ? LRC.plain(s, duration: duration) : p
         }

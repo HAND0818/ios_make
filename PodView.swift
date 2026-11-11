@@ -4,7 +4,7 @@ import UniformTypeIdentifiers
 enum SongFilter: Hashable { case all, artist(String), album(String) }
 
 enum Screen: Hashable {
-    case root, music, youtube, nowPlaying, settings, model, skin, feedback, storage
+    case root, music, youtube, nowPlaying, settings, model, skin, feedback, storage, language
     case songs(SongFilter), artists, albums, playlists, mvList, mvPlayer, coverFlow, ytStub
     case playlist(UUID), pickSongs(UUID), addToPlaylist
 }
@@ -23,6 +23,7 @@ struct PodView: View {
     @State private var nameTarget: UUID?   // nil이면 새 플레이리스트
 
     private var top: Node { stack[stack.count - 1] }
+    private func t(_ k: String) -> String { store.t(k) }
     private func push(_ s: Screen) { stack.append(Node(screen: s)) }
     private func pop() {
         guard stack.count > 1 else { return }
@@ -30,31 +31,44 @@ struct PodView: View {
         stack.removeLast()
     }
 
+    // MARK: 화면 구성 (아이폰 17: 402×874pt 전체 화면 기준, 본체가 화면을 가득 채움)
+
     var body: some View {
         let spec = store.model.spec
         let h = store.housing
-        ZStack {
-            Color(.systemGroupedBackground).ignoresSafeArea()
-            VStack(spacing: 20) {
+        GeometryReader { geo in
+            let dw = spec.width - 36                                   // 설계 기준 LCD 폭
+            let wheelH = spec.wheel + (spec.layout == .row ? 48 : 0)   // 3세대는 버튼 줄 포함
+            let scale = max(0.5, min((geo.size.width - 40) / dw,
+                                     (geo.size.height - 40) / (spec.lcd + 24 + wheelH)))
+            VStack(spacing: 0) {
                 lcd(spec)
+                    .frame(width: dw, height: spec.lcd)
+                    .scaleEffect(scale, anchor: .topLeading)
+                    .frame(width: dw * scale, height: spec.lcd * scale, alignment: .topLeading)
+                Spacer(minLength: 16)
                 ClickWheel(spec: spec, housing: h,
                            step: step, center: center,
                            menu: { store.tick(); pop() },
                            next: { store.tick(); skip(1) },
                            prev: { store.tick(); skip(-1) },
                            playPause: { store.tick(); playPause() })
+                    .fixedSize()
+                    .scaleEffect(scale, anchor: .top)
+                    .frame(width: spec.wheel * scale, height: wheelH * scale, alignment: .top)
             }
-            .padding(18)
-            .frame(width: spec.width)
-            .background(RoundedRectangle(cornerRadius: 26).fill(h.body).shadow(radius: 14, y: 8))
+            .padding(.vertical, 20)
+            .frame(width: geo.size.width, height: geo.size.height)
         }
+        .background(h.body.ignoresSafeArea())
+        .preferredColorScheme(h.name == "Black" ? .dark : .light)
         .fileImporter(isPresented: $picker, allowedContentTypes: [.audio, .movie, .plainText], allowsMultipleSelection: true) { r in
             if case .success(let urls) = r { store.importFiles(urls) }
         }
-        .alert(nameTarget == nil ? "New Playlist" : "Rename Playlist", isPresented: $showName) {
-            TextField("Name", text: $nameText)
-            Button("Save") { saveName() }
-            Button("Cancel", role: .cancel) {}
+        .alert(t(nameTarget == nil ? "New Playlist" : "Rename Playlist"), isPresented: $showName) {
+            TextField(t("Name"), text: $nameText)
+            Button(t("Save")) { saveName() }
+            Button(t("Cancel"), role: .cancel) {}
         }
     }
 
@@ -105,7 +119,7 @@ struct PodView: View {
         switch top.screen {
         case .nowPlaying: NowPlayingView(store: store, theme: th, onAdd: { push(.addToPlaylist) })
         case .mvPlayer: PlayerLayerView(player: store.mvPlayer).background(Color.black)
-        case .coverFlow: CoverFlowView(tracks: store.tracks, selected: top.sel, theme: th)
+        case .coverFlow: CoverFlowView(tracks: store.tracks, selected: top.sel, theme: th, empty: t("No albums"))
         default: MenuList(items: items(top.screen), selected: top.sel, theme: th)
         }
     }
@@ -150,7 +164,7 @@ struct PodView: View {
 
     // MARK: 메뉴 구조
 
-    private func nav(_ t: String, _ s: Screen) -> Item { Item(title: t, chevron: true) { push(s) } }
+    private func nav(_ key: String, _ s: Screen) -> Item { Item(title: t(key), chevron: true) { push(s) } }
 
     private func filtered(_ f: SongFilter) -> [Track] {
         switch f {
@@ -163,26 +177,29 @@ struct PodView: View {
     private func title(_ s: Screen) -> String {
         switch s {
         case .root: return "RetroPod"
-        case .music: return "Music"
-        case .youtube, .ytStub: return "YouTube Music"
-        case .nowPlaying: return "Now Playing"
-        case .settings: return "Settings"
-        case .model: return "iPod Model"
-        case .skin: return "Skin & Theme"
-        case .feedback: return "Wheel Feedback"
-        case .storage: return "Storage & Cache"
-        case .songs: return "Songs"
-        case .artists: return "Artists"
-        case .albums: return "Albums"
-        case .playlists: return "Playlists"
-        case .playlist(let id): return store.playlists.first { $0.id == id }?.name ?? "Playlist"
-        case .pickSongs: return "Add/Remove Songs"
-        case .addToPlaylist: return "Add to Playlist"
-        case .mvList: return "Music Videos"
-        case .mvPlayer: return "Music Video"
-        case .coverFlow: return "Cover Flow"
+        case .music: return t("Music")
+        case .youtube, .ytStub: return t("YouTube Music")
+        case .nowPlaying: return t("Now Playing")
+        case .settings: return t("Settings")
+        case .model: return t("iPod Model")
+        case .skin: return t("Skin & Theme")
+        case .feedback: return t("Wheel Feedback")
+        case .storage: return t("Storage & Cache")
+        case .language: return t("Language")
+        case .songs: return t("Songs")
+        case .artists: return t("Artists")
+        case .albums: return t("Albums")
+        case .playlists: return t("Playlists")
+        case .playlist(let id): return store.playlists.first { $0.id == id }?.name ?? t("Playlists")
+        case .pickSongs: return t("Add/Remove Songs")
+        case .addToPlaylist: return t("Add to Playlist")
+        case .mvList: return t("Music Videos")
+        case .mvPlayer: return t("Music Video")
+        case .coverFlow: return t("Cover Flow")
         }
     }
+
+    private func onOff(_ b: Bool) -> String { t(b ? "On" : "Off") }
 
     private func items(_ s: Screen) -> [Item] {
         switch s {
@@ -195,72 +212,77 @@ struct PodView: View {
             return [nav("Search", .ytStub), nav("Saved Playlists", .ytStub),
                     nav("Offline Downloads", .songs(.all)), nav("Offline MVs", .mvList)]
         case .ytStub:
-            return [Item(title: "StreamResolver 구현 후 사용 가능") {}]
+            return [Item(title: t("Available after StreamResolver is implemented")) {}]
         case .playlists:
-            var out = [Item(title: "+ New Playlist…") { askName(for: nil) }]
+            var out = [Item(title: t("New Playlist…"), icon: "plus") { askName(for: nil) }]
             out += store.playlists.map { p in Item(title: p.name, chevron: true) { push(.playlist(p.id)) } }
             return out
         case .playlist(let id):
-            guard let p = store.playlists.first(where: { $0.id == id }) else { return [Item(title: "(삭제됨)") {}] }
+            guard let p = store.playlists.first(where: { $0.id == id }) else { return [Item(title: t("(Deleted)")) {}] }
             let list = store.tracks(of: p)
             var out: [Item] = []
             if !list.isEmpty {
-                out.append(Item(title: "▶ Play All") { store.start(list[0], in: list); push(.nowPlaying) })
-                out.append(Item(title: "⇄ Shuffle") { let s = list.shuffled(); store.start(s[0], in: s); push(.nowPlaying) })
+                out.append(Item(title: t("Play All"), icon: "play.fill") { store.start(list[0], in: list); push(.nowPlaying) })
+                out.append(Item(title: t("Shuffle"), icon: "shuffle") { let s = list.shuffled(); store.start(s[0], in: s); push(.nowPlaying) })
             }
-            out += list.map { t in Item(title: t.title) { store.start(t, in: list); push(.nowPlaying) } }
-            out.append(Item(title: "Add/Remove Songs…", chevron: true) { push(.pickSongs(id)) })
-            out.append(Item(title: "Rename…") { askName(for: id, text: p.name) })
-            out.append(Item(title: "Delete Playlist") { store.deletePlaylist(id); pop() })
+            out += list.map { tr in Item(title: tr.title) { store.start(tr, in: list); push(.nowPlaying) } }
+            out.append(Item(title: t("Add/Remove Songs…"), chevron: true) { push(.pickSongs(id)) })
+            out.append(Item(title: t("Rename…"), icon: "pencil") { askName(for: id, text: p.name) })
+            out.append(Item(title: t("Delete Playlist"), icon: "trash") { store.deletePlaylist(id); pop() })
             return out
         case .pickSongs(let id):
             guard let p = store.playlists.first(where: { $0.id == id }) else { return [] }
-            return store.tracks.map { t in
-                Item(title: (p.files.contains(t.url.lastPathComponent) ? "✓ " : "    ") + t.title) { store.toggle(t, in: id) }
+            return store.tracks.map { tr in
+                Item(title: tr.title, check: p.files.contains(tr.url.lastPathComponent)) { store.toggle(tr, in: id) }
             }
         case .addToPlaylist:
-            guard let c = store.current, store.tracks.indices.contains(c) else { return [Item(title: "재생 중인 곡이 없어요") {}] }
-            let t = store.tracks[c]
+            guard let c = store.current, store.tracks.indices.contains(c) else { return [Item(title: t("Nothing is playing")) {}] }
+            let tr = store.tracks[c]
             var out = store.playlists.map { p in
-                Item(title: (p.files.contains(t.url.lastPathComponent) ? "✓ " : "    ") + p.name) { store.toggle(t, in: p.id) }
+                Item(title: p.name, check: p.files.contains(tr.url.lastPathComponent)) { store.toggle(tr, in: p.id) }
             }
-            out.append(Item(title: "+ New Playlist…") { askName(for: nil) })
+            out.append(Item(title: t("New Playlist…"), icon: "plus") { askName(for: nil) })
             return out
         case .artists:
-            return Set(store.tracks.map(\.artist)).sorted().map { a in nav(a, .songs(.artist(a))) }
+            return Set(store.tracks.map(\.artist)).sorted().map { a in
+                Item(title: t(a), chevron: true) { push(.songs(.artist(a))) }
+            }
         case .albums:
-            return Set(store.tracks.map(\.album)).sorted().map { a in nav(a, .songs(.album(a))) }
+            return Set(store.tracks.map(\.album)).sorted().map { a in
+                Item(title: t(a), chevron: true) { push(.songs(.album(a))) }
+            }
         case .songs(let f):
             var out: [Item] = []
-            if f == .all { out.append(Item(title: "+ Import Files…") { picker = true }) }
-            out += filtered(f).map { t in
-                Item(title: t.title) {
-                    store.start(t, in: filtered(f)); push(.nowPlaying)
-                }
+            if f == .all { out.append(Item(title: t("Import Files…"), icon: "plus") { picker = true }) }
+            out += filtered(f).map { tr in
+                Item(title: tr.title) { store.start(tr, in: filtered(f)); push(.nowPlaying) }
             }
             return out
         case .mvList:
-            var out = [Item(title: "+ Import MV…") { picker = true }]
-            out += store.mvs.enumerated().map { (i, m) in Item(title: m.title) { store.playMV(i); push(.mvPlayer) } }
+            var out = [Item(title: t("Import MV…"), icon: "plus") { picker = true }]
+            out += store.mvs.enumerated().map { (i, m) in Item(title: m.title, icon: "film") { store.playMV(i); push(.mvPlayer) } }
             return out
         case .settings:
-            return [nav("iPod Model", .model), nav("Skin & Theme", .skin), nav("Wheel Feedback", .feedback), nav("Storage & Cache", .storage)]
+            return [nav("iPod Model", .model), nav("Skin & Theme", .skin), nav("Wheel Feedback", .feedback),
+                    nav("Language", .language), nav("Storage & Cache", .storage)]
         case .model:
             return PodModel.allCases.map { m in
-                Item(title: (m == store.model ? "✓ " : "") + m.rawValue) {
+                Item(title: m.rawValue, check: m == store.model) {
                     store.model = m; store.housingIndex = 0
                     store.theme = m.spec.color ? .color : .mono
                 }
             }
         case .skin:
             let n = store.model.spec.housings.count
-            return [Item(title: "Housing: \(store.housing.name)") { store.housingIndex = (store.housingIndex + 1) % n },
-                    Item(title: "Display: \(store.theme.rawValue)") { store.theme = store.theme.next }]
+            return [Item(title: "\(t("Housing")): \(t(store.housing.name))") { store.housingIndex = (store.housingIndex + 1) % n },
+                    Item(title: "\(t("Display")): \(t(store.theme.rawValue))") { store.theme = store.theme.next }]
         case .feedback:
-            return [Item(title: "Haptic: \(store.haptic ? "On" : "Off")") { store.haptic.toggle() },
-                    Item(title: "Click Sound: \(store.sound ? "On" : "Off")") { store.sound.toggle() }]
+            return [Item(title: "\(t("Haptic")): \(onOff(store.haptic))") { store.haptic.toggle() },
+                    Item(title: "\(t("Click Sound")): \(onOff(store.sound))") { store.sound.toggle() }]
+        case .language:
+            return Lang.allCases.map { l in Item(title: l.rawValue, check: l == store.lang) { store.lang = l } }
         case .storage:
-            return [Item(title: "Songs: \(store.tracks.count)") {}, Item(title: "MVs: \(store.mvs.count)") {}]
+            return [Item(title: "\(t("Songs")): \(store.tracks.count)") {}, Item(title: "\(t("MVs")): \(store.mvs.count)") {}]
         case .nowPlaying, .mvPlayer, .coverFlow:
             return []
         }

@@ -4,6 +4,8 @@ import AVFoundation
 struct Item {
     let title: String
     var chevron = false
+    var icon: String? = nil     // SF Symbols 이름
+    var check: Bool? = nil      // nil이면 체크 칸 없음, true면 ✓ 표시
     let action: () -> Void
 }
 
@@ -33,7 +35,11 @@ struct MenuList: View {
             ScrollView {
                 VStack(spacing: 0) {
                     ForEach(items.indices, id: \.self) { i in
-                        HStack {
+                        HStack(spacing: 5) {
+                            if let c = items[i].check {
+                                Image(systemName: "checkmark").font(.system(size: 11, weight: .bold)).opacity(c ? 1 : 0).frame(width: 14)
+                            }
+                            if let ic = items[i].icon { Image(systemName: ic).font(.system(size: 11, weight: .bold)) }
                             Text(items[i].title).lineLimit(1)
                             Spacer()
                             if items[i].chevron { Image(systemName: "chevron.right").font(.system(size: 10, weight: .bold)) }
@@ -65,14 +71,14 @@ struct NowPlayingView: View {
         let t: Track? = store.current.flatMap { store.tracks.indices.contains($0) ? store.tracks[$0] : nil }
         VStack(alignment: .leading, spacing: 6) {
             if store.showLyrics {
-                LyricsView(lines: store.lyrics, time: store.time)
+                LyricsView(lines: store.lyrics, time: store.time, empty: store.t("No lyrics"))
             } else {
                 HStack(spacing: 10) {
                     CoverArt(track: t).frame(width: 56, height: 56).clipShape(RoundedRectangle(cornerRadius: 4))
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(t?.title ?? "Nothing playing").font(.system(size: 14, weight: .bold)).lineLimit(2)
-                        Text(t?.artist ?? "")
-                        Text(t?.album ?? "")
+                        Text(t?.title ?? store.t("Nothing playing")).font(.system(size: 14, weight: .bold)).lineLimit(2)
+                        Text(store.t(t?.artist ?? ""))
+                        Text(store.t(t?.album ?? ""))
                     }.font(.system(size: 12))
                     Spacer(minLength: 0)
                 }
@@ -94,11 +100,12 @@ struct NowPlayingView: View {
 struct LyricsView: View {
     let lines: [LyricLine]
     let time: Double
+    var empty = ""
     var body: some View {
         let idx = lines.lastIndex { $0.time <= time } ?? -1
         VStack(spacing: 4) {
             if lines.isEmpty {
-                Text("가사 없음 (같은 이름의 .lrc 파일을 함께 넣어 주세요)").font(.system(size: 12)).multilineTextAlignment(.center)
+                Text(empty).font(.system(size: 12)).multilineTextAlignment(.center)
             } else {
                 ForEach([-1, 0, 1], id: \.self) { o in
                     Text(lines.indices.contains(idx + o) ? lines[idx + o].text : " ")
@@ -116,6 +123,7 @@ struct CoverFlowView: View {
     let tracks: [Track]
     let selected: Int
     let theme: DisplayTheme
+    var empty = ""
     var body: some View {
         ZStack {
             ForEach(tracks.indices, id: \.self) { i in
@@ -132,7 +140,7 @@ struct CoverFlowView: View {
             }
             VStack {
                 Spacer()
-                Text(tracks.indices.contains(selected) ? tracks[selected].title : "No albums")
+                Text(tracks.indices.contains(selected) ? tracks[selected].title : empty)
                     .font(.system(size: 13)).padding(.bottom, 6)
             }
         }

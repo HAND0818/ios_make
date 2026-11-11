@@ -13,12 +13,15 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Find and Build Project
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode Project
+        run: xcodegen generate
+
+      - name: Build Archive
         run: |
-          PROJECT_FILE=$(find . -name "*.xcodeproj" -maxdepth 2 | head -n 1)
-          echo "Found project: $PROJECT_FILE"
-          
-          xcodebuild -project "$PROJECT_FILE" \
+          xcodebuild -project RetroPod.xcodeproj \
                      -scheme "RetroPod" \
                      -sdk iphoneos \
                      -configuration Release \

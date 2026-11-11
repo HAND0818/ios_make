@@ -1,4 +1,5 @@
 import AVFoundation
+import Combine
 import AudioToolbox
 import SwiftUI
 import UIKit
@@ -32,6 +33,9 @@ final class PlayerStore: ObservableObject {
 
     let player = AVPlayer()
     let mvPlayer = AVPlayer()
+    let server = WiFiServer()
+    private var bag = Set<AnyCancellable>()
+    private var refreshWork: DispatchWorkItem?
     private let impact = UIImpactFeedbackGenerator(style: .light)
 
     static let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
@@ -55,7 +59,18 @@ final class PlayerStore: ObservableObject {
             guard let self, (n.object as? AVPlayerItem) === self.player.currentItem else { return }
             self.next()
         }
+        // Wi-Fi 서버 상태 변화를 화면에 전달하고, 업로드가 끝나면 라이브러리를 다시 읽음
+        server.objectWillChange.sink { [weak self] _ in self?.objectWillChange.send() }.store(in: &bag)
+        server.onUploaded = { [weak self] in self?.scheduleRefresh() }
         refreshLibrary()
+    }
+
+    /// 여러 파일이 연달아 올라올 때 새로고침을 한 번으로 묶음
+    private func scheduleRefresh() {
+        refreshWork?.cancel()
+        let w = DispatchWorkItem { [weak self] in self?.refreshLibrary() }
+        refreshWork = w
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1, execute: w)
     }
 
     // MARK: 라이브러리

@@ -4,7 +4,7 @@ import UniformTypeIdentifiers
 enum SongFilter: Hashable { case all, artist(String), album(String) }
 
 enum Screen: Hashable {
-    case root, music, youtube, nowPlaying, settings, model, skin, feedback, storage, language
+    case root, music, youtube, nowPlaying, settings, model, skin, feedback, storage, language, wifi
     case songs(SongFilter), artists, albums, playlists, mvList, mvPlayer, coverFlow, ytStub
     case playlist(UUID), pickSongs(UUID), addToPlaylist
 }
@@ -186,6 +186,7 @@ struct PodView: View {
         case .feedback: return t("Wheel Feedback")
         case .storage: return t("Storage & Cache")
         case .language: return t("Language")
+        case .wifi: return t("Wi-Fi Transfer")
         case .songs: return t("Songs")
         case .artists: return t("Artists")
         case .albums: return t("Albums")
@@ -264,7 +265,7 @@ struct PodView: View {
             return out
         case .settings:
             return [nav("iPod Model", .model), nav("Skin & Theme", .skin), nav("Wheel Feedback", .feedback),
-                    nav("Language", .language), nav("Storage & Cache", .storage)]
+                    nav("Language", .language), nav("Wi-Fi Transfer", .wifi), nav("Storage & Cache", .storage)]
         case .model:
             return PodModel.allCases.map { m in
                 Item(title: m.rawValue, check: m == store.model) {
@@ -279,6 +280,19 @@ struct PodView: View {
         case .feedback:
             return [Item(title: "\(t("Haptic")): \(onOff(store.haptic))") { store.haptic.toggle() },
                     Item(title: "\(t("Click Sound")): \(onOff(store.sound))") { store.sound.toggle() }]
+        case .wifi:
+            var out = [Item(title: "\(t("Wi-Fi Transfer")): \(onOff(store.server.isRunning))") {
+                if store.server.isRunning { store.server.stop() } else { store.server.start() }
+            }]
+            if store.server.isRunning {
+                if store.server.address.isEmpty {
+                    out.append(Item(title: t("Wi-Fi not connected")) {})
+                } else {
+                    out.append(Item(title: store.server.address) {})
+                    out.append(Item(title: t("Open in a browser")) {})
+                }
+            }
+            return out
         case .language:
             return Lang.allCases.map { l in Item(title: l.rawValue, check: l == store.lang) { store.lang = l } }
         case .storage:

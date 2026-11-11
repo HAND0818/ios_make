@@ -26,6 +26,8 @@ enum L10n {
         "Housing": "본체 색상", "Display": "디스플레이",
         "Monochrome": "흑백", "Backlight": "백라이트", "Color": "컬러",
         "Haptic": "햅틱", "Click Sound": "클릭음", "On": "켬", "Off": "끔", "MVs": "MV",
+        "Wi-Fi Transfer": "Wi-Fi 전송", "Wi-Fi not connected": "Wi-Fi에 연결되어 있지 않아요",
+        "Open in a browser": "브라우저에서 열어 주세요",
         "Unknown Artist": "알 수 없는 아티스트", "Unknown Album": "알 수 없는 앨범",
         "White": "화이트", "Black": "블랙", "Silver": "실버", "Blue": "블루", "Pink": "핑크", "Green": "그린",
         "Gold": "골드", "Red": "레드", "Purple": "퍼플", "Orange": "오렌지", "Yellow": "옐로"

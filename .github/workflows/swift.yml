@@ -13,9 +13,13 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Build Archive
+      - name: Find and Build Project
         run: |
-          xcodebuild -scheme "RetroPod" \
+          PROJECT_FILE=$(find . -name "*.xcodeproj" -maxdepth 2 | head -n 1)
+          echo "Found project: $PROJECT_FILE"
+          
+          xcodebuild -project "$PROJECT_FILE" \
+                     -scheme "RetroPod" \
                      -sdk iphoneos \
                      -configuration Release \
                      -archivePath "$PWD/build/RetroPod.xcarchive" \

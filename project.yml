@@ -1,0 +1,11 @@
+name: RetroPod
+targets:
+  RetroPod:
+    type: application
+    platform: iOS
+    deploymentTarget: "16.0"
+    sources:
+      - .
+    settings:
+      PRODUCT_BUNDLE_IDENTIFIER: com.example.RetroPod
+      GENERATE_INFOPLIST_FILE: YES
